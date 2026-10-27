@@ -1,0 +1,253 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Attendance Tracker</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f0f4f8;
+    padding: 20px;
+}
+.container {
+    max-width: 900px;
+    margin: auto;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+}
+h1 {
+    text-align: center;
+    color: #2457d6;
+}
+input, button, select {
+    padding: 10px;
+    margin: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+button {
+    background: #2457d6;
+    color: white;
+    cursor: pointer;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+th {
+    background: #2457d6;
+    color: white;
+}
+.summary {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    background: #edf3ff;
+}
+.delete {
+    background: #d93649;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h1>Student Attendance Tracker</h1>
+
+<h2>Add Student</h2>
+<input id="name" placeholder="Student Name">
+<input id="roll" placeholder="Roll Number">
+<input id="className" placeholder="Class">
+<button onclick="addStudent()">Add Student</button>
+
+<h2>Mark Attendance</h2>
+<input type="date" id="date">
+<button onclick="saveAttendance()">Save Attendance</button>
+
+<h2>Student Records</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Roll No.</th>
+<th>Class</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="studentList"></tbody>
+</table>
+
+<h2>Attendance Summary</h2>
+<div class="summary">
+<p>Total: <span id="total">0</span></p>
+<p>Present: <span id="present">0</span></p>
+<p>Absent: <span id="absent">0</span></p>
+</div>
+
+</div>
+
+<script>
+let students = JSON.parse(localStorage.getItem("students") || "[]");
+let attendance = JSON.parse(localStorage.getItem("attendance") || "{}");
+
+const dateInput = document.getElementById("date");
+
+function today() {
+    const d = new Date();
+    return d.getFullYear() + "-" +
+        String(d.getMonth() + 1).padStart(2, "0") + "-" +
+        String(d.getDate()).padStart(2, "0");
+}
+
+dateInput.value = today();
+
+function saveData() {
+    localStorage.setItem("students", JSON.stringify(students));
+    localStorage.setItem("attendance", JSON.stringify(attendance));
+}
+
+function addStudent() {
+    const name = document.getElementById("name").value.trim();
+    const roll = document.getElementById("roll").value.trim();
+    const className = document.getElementById("className").value.trim();
+
+    if (!name || !roll || !className) {
+        alert("Please fill all fields!");
+        return;
+    }
+
+    if (students.some(s => s.roll.toLowerCase() === roll.toLowerCase())) {
+        alert("Roll number already exists!");
+        return;
+    }
+
+    students.push({
+        id: Date.now().toString(),
+        name: name,
+        roll: roll,
+        className: className
+    });
+
+    saveData();
+
+    document.getElementById("name").value = "";
+    document.getElementById("roll").value = "";
+    document.getElementById("className").value = "";
+
+    displayStudents();
+}
+
+function saveAttendance() {
+    const date = dateInput.value;
+
+    if (!date) {
+        alert("Please select a date!");
+        return;
+    }
+
+    attendance[date] = attendance[date] || {};
+
+    document.querySelectorAll(".status").forEach(select => {
+        const id = select.dataset.id;
+
+        if (select.value === "Unmarked") {
+            delete attendance[date][id];
+        } else {
+            attendance[date][id] = select.value;
+        }
+    });
+
+    saveData();
+    displayStudents();
+    alert("Attendance saved successfully!");
+}
+
+function deleteStudent(id) {
+    if (!confirm("Delete this student?")) return;
+
+    students = students.filter(s => s.id !== id);
+
+    Object.keys(attendance).forEach(date => {
+        delete attendance[date][id];
+    });
+
+    saveData();
+    displayStudents();
+}
+
+function displayStudents() {
+    const list = document.getElementById("studentList");
+    const date = dateInput.value;
+
+    list.innerHTML = "";
+
+    let present = 0;
+    let absent = 0;
+
+    students.forEach(student => {
+        const status = attendance[date]?.[student.id] || "Unmarked";
+
+        if (status === "Present" || status === "Late") present++;
+        if (status === "Absent") absent++;
+
+        const row = document.createElement("tr");
+
+        const nameCell = document.createElement("td");
+        nameCell.textContent = student.name;
+
+        const rollCell = document.createElement("td");
+        rollCell.textContent = student.roll;
+
+        const classCell = document.createElement("td");
+        classCell.textContent = student.className;
+
+        const statusCell = document.createElement("td");
+        const select = document.createElement("select");
+        select.className = "status";
+        select.dataset.id = student.id;
+
+        ["Unmarked", "Present", "Absent", "Late", "Excused"].forEach(value => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = value;
+            select.appendChild(option);
+        });
+
+        select.value = status;
+        statusCell.appendChild(select);
+
+        const actionCell = document.createElement("td");
+        const button = document.createElement("button");
+        button.textContent = "Delete";
+        button.className = "delete";
+        button.onclick = () => deleteStudent(student.id);
+        actionCell.appendChild(button);
+
+        row.append(nameCell, rollCell, classCell, statusCell, actionCell);
+        list.appendChild(row);
+    });
+
+    document.getElementById("total").textContent = students.length;
+    document.getElementById("present").textContent = present;
+    document.getElementById("absent").textContent = absent;
+}
+
+dateInput.addEventListener("change", displayStudents);
+displayStudents();
+</script>
+
+</body>
+  </html>
+  
